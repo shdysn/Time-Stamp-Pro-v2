@@ -1,21 +1,24 @@
 package com.example.presentation.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.AltitudeUnit
 import com.example.data.model.CoordinateFormat
-import com.example.data.model.StampDesignStyle
 import com.example.data.model.StampFontSize
 import com.example.data.model.StampPosition
+import com.example.data.model.StampTemplateType
 import com.example.data.model.UserSettings
+import com.example.data.repository.SettingsRepository
 import com.example.location.CompassManager
 import com.example.location.GPSManager
 import com.example.storage.FileManager
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class DiagnosticsInfo(
@@ -29,12 +32,17 @@ data class DiagnosticsInfo(
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val repository = SettingsRepository(application)
     private val fileManager = FileManager(application)
     private val gpsManager = GPSManager(application)
     private val compassManager = CompassManager(application)
 
-    private val _settings = MutableStateFlow(UserSettings())
-    val settings: StateFlow<UserSettings> = _settings.asStateFlow()
+    val settings: StateFlow<UserSettings> = repository.settingsFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = UserSettings()
+        )
 
     private val _diagnostics = MutableStateFlow(DiagnosticsInfo())
     val diagnostics: StateFlow<DiagnosticsInfo> = _diagnostics.asStateFlow()
@@ -55,60 +63,101 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun updateDateFormat(format: String) {
-        _settings.update { it.copy(dateFormat = format) }
+    fun updateTemplateType(type: StampTemplateType) {
+        Log.i("SettingsViewModel", "updateTemplateType called: $type")
+        viewModelScope.launch {
+            repository.setTemplateType(type)
+        }
     }
 
-    fun updateCoordinateFormat(format: CoordinateFormat) {
-        _settings.update { it.copy(coordinateFormat = format) }
-    }
-
-    fun updateAltitudeUnit(unit: AltitudeUnit) {
-        _settings.update { it.copy(altitudeUnit = unit) }
+    fun updateStampDesignStyle(style: com.example.data.model.StampDesignStyle) {
+        val type = when (style) {
+            com.example.data.model.StampDesignStyle.CLASSIC_CARD -> StampTemplateType.CLASSIC_CARD
+            com.example.data.model.StampDesignStyle.MODERN_MINIMAL -> StampTemplateType.MODERN_MINIMAL
+            com.example.data.model.StampDesignStyle.TECH_HUD -> StampTemplateType.CYBER_TECH_HUD
+            com.example.data.model.StampDesignStyle.OUTLINE_FRAME -> StampTemplateType.FRAMED_OUTLINE
+            com.example.data.model.StampDesignStyle.COMPACT_PILL -> StampTemplateType.COMPACT_PILL
+            com.example.data.model.StampDesignStyle.BOTTOM_BANNER -> StampTemplateType.FULL_BANNER
+        }
+        updateTemplateType(type)
     }
 
     fun updateStampPosition(pos: StampPosition) {
-        _settings.update { it.copy(stampPosition = pos) }
-    }
-
-    fun updateStampDesignStyle(style: StampDesignStyle) {
-        _settings.update { it.copy(stampDesignStyle = style) }
+        viewModelScope.launch {
+            repository.setStampPosition(pos)
+        }
     }
 
     fun updateTextColor(colorHex: Long) {
-        _settings.update { it.copy(textColorHex = colorHex) }
+        viewModelScope.launch {
+            repository.setTextColor(colorHex)
+        }
     }
 
     fun updateBackgroundOpacity(opacity: Float) {
-        _settings.update { it.copy(backgroundOpacity = opacity) }
+        viewModelScope.launch {
+            repository.setBackgroundOpacity(opacity)
+        }
     }
 
     fun updateFontSize(size: StampFontSize) {
-        _settings.update { it.copy(fontSize = size) }
+        viewModelScope.launch {
+            repository.setFontSize(size)
+        }
     }
 
-    fun toggleShowAddress(show: Boolean) {
-        _settings.update { it.copy(showAddress = show) }
+    fun updateDateFormat(format: String) {
+        viewModelScope.launch {
+            repository.setDateFormat(format)
+        }
     }
 
-    fun toggleShowCoordinates(show: Boolean) {
-        _settings.update { it.copy(showCoordinates = show) }
+    fun updateCoordinateFormat(format: CoordinateFormat) {
+        viewModelScope.launch {
+            repository.setCoordinateFormat(format)
+        }
     }
 
-    fun toggleShowAltitude(show: Boolean) {
-        _settings.update { it.copy(showAltitude = show) }
-    }
-
-    fun toggleShowCompass(show: Boolean) {
-        _settings.update { it.copy(showCompass = show) }
+    fun updateAltitudeUnit(unit: AltitudeUnit) {
+        viewModelScope.launch {
+            repository.setAltitudeUnit(unit)
+        }
     }
 
     fun toggleShowTimestamp(show: Boolean) {
-        _settings.update { it.copy(showTimestamp = show) }
+        viewModelScope.launch {
+            repository.setShowTimestamp(show)
+        }
+    }
+
+    fun toggleShowCoordinates(show: Boolean) {
+        viewModelScope.launch {
+            repository.setShowCoordinates(show)
+        }
+    }
+
+    fun toggleShowAddress(show: Boolean) {
+        viewModelScope.launch {
+            repository.setShowAddress(show)
+        }
+    }
+
+    fun toggleShowAltitude(show: Boolean) {
+        viewModelScope.launch {
+            repository.setShowAltitude(show)
+        }
+    }
+
+    fun toggleShowCompass(show: Boolean) {
+        viewModelScope.launch {
+            repository.setShowCompass(show)
+        }
     }
 
     fun toggleStampVisibility(show: Boolean) {
-        _settings.update { it.copy(isStampVisible = show) }
+        viewModelScope.launch {
+            repository.setStampVisible(show)
+        }
     }
 
     fun updateCustomText(
@@ -120,42 +169,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         isUnderline: Boolean,
         colorHex: Long
     ) {
-        _settings.update {
-            it.copy(
-                customText = text,
-                isCustomTextEnabled = isEnabled,
-                customTextSize = size,
-                isCustomTextBold = isBold,
-                isCustomTextItalic = isItalic,
-                isCustomTextUnderline = isUnderline,
-                customTextColorHex = colorHex
-            )
+        viewModelScope.launch {
+            repository.setCustomText(text, isEnabled, size, isBold, isItalic, isUnderline, colorHex)
         }
     }
 
     fun toggleCustomTextEnabled(enabled: Boolean) {
-        _settings.update { it.copy(isCustomTextEnabled = enabled) }
-    }
-
-    fun toggleShowBadge(show: Boolean) {
-        _settings.update { it.copy(showProjectBadge = show) }
+        viewModelScope.launch {
+            repository.setCustomTextEnabled(enabled)
+        }
     }
 
     fun toggleSaveOriginal(save: Boolean) {
-        _settings.update { it.copy(saveOriginalCopy = save) }
-    }
-
-    fun toggleAutoSaveToGallery(autoSave: Boolean) {
-        _settings.update { it.copy(autoSaveToGallery = autoSave) }
-    }
-
-    fun setProjectDefaults(projectName: String, inspectorName: String, notes: String) {
-        _settings.update {
-            it.copy(
-                projectName = projectName,
-                inspectorName = inspectorName,
-                customNotes = notes
-            )
+        viewModelScope.launch {
+            repository.setSaveOriginalCopy(save)
         }
     }
 }

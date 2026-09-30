@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.camera.FlashMode
+import com.example.data.model.StampTemplateType
 import com.example.data.model.TemplateData
 import com.example.presentation.designsystem.AppColors
 
@@ -190,8 +191,8 @@ fun ZoomControlBar(
 
 @Composable
 fun TemplateQuickSelector(
-    selectedTemplateId: String,
-    onTemplateSelected: (String) -> Unit,
+    selectedTemplate: StampTemplateType,
+    onTemplateSelected: (StampTemplateType) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyRow(
@@ -200,9 +201,9 @@ fun TemplateQuickSelector(
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(TemplateData.ALL_TEMPLATES) { template ->
-            val isSelected = template.id == selectedTemplateId
-            val badgeColor = Color(template.primaryColorHex)
+        items(StampTemplateType.entries) { template ->
+            val isSelected = template == selectedTemplate
+            val badgeColor = AppColors.AccentGold
 
             Box(
                 modifier = Modifier
@@ -216,7 +217,7 @@ fun TemplateQuickSelector(
                         color = if (isSelected) badgeColor else Color.White.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(16.dp)
                     )
-                    .clickable { onTemplateSelected(template.id) }
+                    .clickable { onTemplateSelected(template) }
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Row(
@@ -229,7 +230,7 @@ fun TemplateQuickSelector(
                             .background(badgeColor, CircleShape)
                     )
                     Text(
-                        text = template.name,
+                        text = template.displayName,
                         color = if (isSelected) Color.White else Color(0xFFCBD5E1),
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium

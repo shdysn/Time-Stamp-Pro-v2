@@ -1,48 +1,36 @@
 package com.example.presentation.components
 
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.AltitudeUnit
 import com.example.data.model.LocationData
-import com.example.data.model.StampDesignStyle
 import com.example.data.model.StampPosition
-import com.example.data.model.TemplateData
+import com.example.data.model.StampTemplateType
 import com.example.data.model.UserSettings
-import com.example.presentation.designsystem.AppColors
-import com.example.timestamp.CoordinateFormatter
-import com.example.timestamp.DateFormatter
-import java.util.Locale
+import com.example.presentation.components.stamps.ClassicCardStamp
+import com.example.presentation.components.stamps.CompactPillStamp
+import com.example.presentation.components.stamps.CyberTechHudStamp
+import com.example.presentation.components.stamps.FramedOutlineStamp
+import com.example.presentation.components.stamps.FullBannerStamp
+import com.example.presentation.components.stamps.ModernMinimalStamp
+
+private const val TAG = "TimestampOverlay"
 
 @Composable
 fun TimestampOverlayView(
@@ -52,11 +40,7 @@ fun TimestampOverlayView(
     currentTimeMillis: Long,
     modifier: Modifier = Modifier
 ) {
-    val template = TemplateData.getById(settings.selectedTemplateId)
-    val stampColor = Color(settings.textColorHex)
-    val bgAlpha = settings.backgroundOpacity.coerceIn(0f, 1f)
-    val baseFontSize = (12f * settings.fontSize.scale).sp
-    val titleFontSize = (13f * settings.fontSize.scale).sp
+    Log.d(TAG, "Rendering live preview overlay for template: ${settings.templateType}")
 
     val boxAlignment = when (settings.stampPosition) {
         StampPosition.TOP_LEFT -> Alignment.TopStart
@@ -66,10 +50,10 @@ fun TimestampOverlayView(
         StampPosition.BOTTOM_BANNER -> Alignment.BottomCenter
     }
 
-    val isBanner = settings.stampPosition == StampPosition.BOTTOM_BANNER
+    val isBanner = settings.templateType == StampTemplateType.FULL_BANNER || settings.stampPosition == StampPosition.BOTTOM_BANNER
 
     Box(modifier = modifier.fillMaxSize()) {
-        // 1. Custom Text Overlay at top center (with Size, Bold, Italic, Underline, and Color)
+        // 1. Optional Custom Text Banner at top
         if (settings.isCustomTextEnabled && settings.customText.isNotBlank()) {
             Box(
                 modifier = Modifier
@@ -97,175 +81,67 @@ fun TimestampOverlayView(
             }
         }
 
-        // 2. Timestamp Watermark Stamp (respects isStampVisible)
+        // 2. Separate Distinct Stamp Composables via Exhaustive when
         if (settings.isStampVisible) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(if (isBanner) 0.dp else 16.dp),
-                contentAlignment = boxAlignment
+                contentAlignment = if (isBanner) Alignment.BottomCenter else boxAlignment
             ) {
-                val style = if (isBanner) StampDesignStyle.BOTTOM_BANNER else settings.stampDesignStyle
-                val containerShape = when (style) {
-                    StampDesignStyle.CLASSIC_CARD -> RoundedCornerShape(10.dp)
-                    StampDesignStyle.MODERN_MINIMAL -> RoundedCornerShape(6.dp)
-                    StampDesignStyle.TECH_HUD -> RoundedCornerShape(2.dp)
-                    StampDesignStyle.OUTLINE_FRAME -> RoundedCornerShape(6.dp)
-                    StampDesignStyle.COMPACT_PILL -> RoundedCornerShape(22.dp)
-                    StampDesignStyle.BOTTOM_BANNER -> RoundedCornerShape(0.dp)
-                }
-                val effectiveBgAlpha = if (style == StampDesignStyle.OUTLINE_FRAME) bgAlpha * 0.45f else bgAlpha
-                val borderWidth = if (isBanner) 0.dp else if (style == StampDesignStyle.OUTLINE_FRAME) 2.dp else 1.dp
-
-                Row(
-                    modifier = Modifier
-                        .then(if (isBanner) Modifier.fillMaxWidth() else Modifier)
-                        .background(
-                            color = Color.Black.copy(alpha = effectiveBgAlpha),
-                            shape = containerShape
-                        )
-                        .border(
-                            width = borderWidth,
-                            color = stampColor.copy(alpha = if (style == StampDesignStyle.OUTLINE_FRAME) 0.9f else 0.65f),
-                            shape = containerShape
-                        )
-                        .padding(horizontal = if (style == StampDesignStyle.COMPACT_PILL) 16.dp else 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (style == StampDesignStyle.MODERN_MINIMAL) {
-                        Box(
-                            modifier = Modifier
-                                .width(3.5.dp)
-                                .height(50.dp)
-                                .background(stampColor, RoundedCornerShape(2.dp))
+                when (settings.templateType) {
+                    StampTemplateType.CLASSIC_CARD -> {
+                        ClassicCardStamp(
+                            settings = settings,
+                            location = location,
+                            heading = heading,
+                            currentTimeMillis = currentTimeMillis
                         )
                     }
 
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                    // Mock GPS Warning if active
-                    if (location.isMock) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = "Mock GPS",
-                                tint = AppColors.AccentRed,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                text = "MOCK GPS DETECTED",
-                                color = AppColors.AccentRed,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    // Timestamp
-                    if (settings.showTimestamp) {
-                        val formattedDate = DateFormatter.format(currentTimeMillis, settings.dateFormat)
-                        val tzOffset = DateFormatter.getTimezoneOffsetString()
-                        Text(
-                            text = "TIME: $formattedDate ($tzOffset)",
-                            color = stampColor,
-                            fontSize = baseFontSize,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                    StampTemplateType.MODERN_MINIMAL -> {
+                        ModernMinimalStamp(
+                            settings = settings,
+                            location = location,
+                            currentTimeMillis = currentTimeMillis
                         )
                     }
 
-                    // Coordinates
-                    if (settings.showCoordinates) {
-                        val coords = CoordinateFormatter.format(
-                            location.latitude,
-                            location.longitude,
-                            settings.coordinateFormat
-                        )
-                        val acc = if (location.accuracy > 0) String.format(Locale.US, " (±%.1fm)", location.accuracy) else ""
-                        Text(
-                            text = "GPS:  $coords$acc",
-                            color = stampColor,
-                            fontSize = baseFontSize,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = FontFamily.Monospace
+                    StampTemplateType.CYBER_TECH_HUD -> {
+                        CyberTechHudStamp(
+                            settings = settings,
+                            location = location,
+                            heading = heading,
+                            currentTimeMillis = currentTimeMillis
                         )
                     }
 
-                    // Address
-                    if (settings.showAddress && location.address.isNotBlank() && location.address != "Detecting location...") {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "Location",
-                                tint = stampColor.copy(alpha = 0.8f),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = location.address,
-                                color = Color(0xFFE2E8F0),
-                                fontSize = (baseFontSize.value * 0.95f).sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 2
-                            )
-                        }
+                    StampTemplateType.FRAMED_OUTLINE -> {
+                        FramedOutlineStamp(
+                            settings = settings,
+                            location = location,
+                            currentTimeMillis = currentTimeMillis
+                        )
                     }
 
-                    // Altitude & Heading
-                    val hasAlt = settings.showAltitude
-                    val hasCompass = settings.showCompass
-                    if (hasAlt || hasCompass) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            if (hasAlt) {
-                                val altText = if (settings.altitudeUnit == AltitudeUnit.METERS) {
-                                    "${String.format(Locale.US, "%.1f", location.altitude)}m"
-                                } else {
-                                    "${String.format(Locale.US, "%.1f", location.altitude * 3.28084)}ft"
-                                }
-                                Text(
-                                    text = "ALT: $altText",
-                                    color = stampColor,
-                                    fontSize = baseFontSize,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
+                    StampTemplateType.COMPACT_PILL -> {
+                        CompactPillStamp(
+                            settings = settings,
+                            location = location,
+                            currentTimeMillis = currentTimeMillis
+                        )
+                    }
 
-                            if (hasCompass) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Explore,
-                                        contentDescription = "Compass",
-                                        tint = AppColors.AccentCyan,
-                                        modifier = Modifier
-                                            .size(14.dp)
-                                            .rotate(-heading)
-                                    )
-                                    Text(
-                                        text = "DIR: ${CoordinateFormatter.formatBearing(heading)}",
-                                        color = stampColor,
-                                        fontSize = baseFontSize,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        }
+                    StampTemplateType.FULL_BANNER -> {
+                        FullBannerStamp(
+                            settings = settings,
+                            location = location,
+                            heading = heading,
+                            currentTimeMillis = currentTimeMillis
+                        )
                     }
                 }
             }
         }
     }
-}
 }

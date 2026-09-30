@@ -49,6 +49,7 @@ data class UserSettings(
     val coordinateFormat: CoordinateFormat = CoordinateFormat.DECIMAL,
     val altitudeUnit: AltitudeUnit = AltitudeUnit.METERS,
     val stampPosition: StampPosition = StampPosition.BOTTOM_LEFT,
+    val templateType: StampTemplateType = StampTemplateType.CLASSIC_CARD,
     val stampDesignStyle: StampDesignStyle = StampDesignStyle.CLASSIC_CARD,
     val textColorHex: Long = 0xFFFFC107, // Safety Gold default
     val backgroundOpacity: Float = 0.65f,

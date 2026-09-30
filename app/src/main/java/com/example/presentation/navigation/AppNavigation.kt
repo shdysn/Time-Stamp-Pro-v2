@@ -1,9 +1,9 @@
 package com.example.presentation.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -28,8 +28,8 @@ fun AppNavigation(
     cameraViewModel: CameraViewModel = viewModel(),
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
-    val cameraUiState by cameraViewModel.uiState.collectAsState()
-    val globalSettings by settingsViewModel.settings.collectAsState()
+    val cameraUiState by cameraViewModel.uiState.collectAsStateWithLifecycle()
+    val globalSettings by settingsViewModel.settings.collectAsStateWithLifecycle()
 
     // Sync settings between SettingsViewModel and CameraViewModel
     cameraViewModel.updateSettings(globalSettings)
@@ -56,11 +56,12 @@ fun AppNavigation(
 
         composable(AppDestinations.TEMPLATES) {
             TemplateScreen(
-                currentTemplateId = cameraUiState.settings.selectedTemplateId,
-                onTemplateSelected = { selectedId ->
-                    cameraViewModel.setTemplate(selectedId)
+                currentTemplate = cameraUiState.settings.templateType,
+                onTemplateSelected = { selectedType ->
+                    cameraViewModel.setTemplate(selectedType)
                 },
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                userSettings = cameraUiState.settings
             )
         }
     }

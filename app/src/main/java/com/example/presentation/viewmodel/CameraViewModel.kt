@@ -10,14 +10,18 @@ import androidx.lifecycle.viewModelScope
 import com.example.camera.CameraManager
 import com.example.camera.FlashMode
 import com.example.data.model.LocationData
+import com.example.data.model.StampTemplateType
 import com.example.data.model.TemplateData
 import com.example.data.model.UserSettings
+import com.example.data.repository.SettingsRepository
 import com.example.database.AppDatabase
 import com.example.database.MediaEntity
 import com.example.location.CompassManager
 import com.example.location.GPSManager
 import com.example.storage.FileManager
+import com.example.watermark.StampRenderRequest
 import com.example.watermark.WatermarkEngine
+import android.util.Log
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +61,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val gpsManager = GPSManager(application)
     val compassManager = CompassManager(application)
     val fileManager = FileManager(application)
+    private val settingsRepository = SettingsRepository(application)
 
     private val _uiState = MutableStateFlow(CameraUiState())
     val uiState: StateFlow<CameraUiState> = _uiState.asStateFlow()
@@ -65,6 +70,14 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
     val effect: SharedFlow<CameraUiEffect> = _effect.asSharedFlow()
 
     init {
+        // Collect persistent settings from DataStore immediately
+        viewModelScope.launch {
+            settingsRepository.settingsFlow.collect { settings ->
+                Log.i("CameraViewModel", "Observed settings update from DataStore: template=${settings.templateType}")
+                _uiState.update { it.copy(settings = settings) }
+            }
+        }
+
         // Collect camera states
         viewModelScope.launch {
             cameraManager.isFrontCamera.collect { isFront ->
@@ -152,17 +165,16 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         cameraManager.setZoom(zoom)
     }
 
-    fun setTemplate(templateId: String) {
-        _uiState.update { current ->
-            current.copy(
-                settings = current.settings.copy(
-                    selectedTemplateId = templateId,
-                    projectName = "",
-                    inspectorName = "",
-                    customNotes = ""
-                )
-            )
+    fun setTemplate(templateType: StampTemplateType) {
+        Log.i("CameraViewModel", "setTemplate selected: $templateType")
+        viewModelScope.launch {
+            settingsRepository.setTemplateType(templateType)
         }
+    }
+
+    fun setTemplate(templateId: String) {
+        val type = StampTemplateType.fromId(templateId)
+        setTemplate(type)
     }
 
     fun updateSettings(newSettings: UserSettings) {
@@ -242,15 +254,20 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 // 1. Capture raw bitmap from camera or fallback simulator
                 val rawBitmap = cameraManager.capturePhoto()
 
-                // 2. Prepare mutable copy and apply watermark engine
+                // 2. Prepare mutable copy and apply watermark engine with explicit template
                 val timestamp = System.currentTimeMillis()
-                val stampedBitmap = WatermarkEngine.applyWatermark(
+                val activeSettings = _uiState.value.settings
+                Log.i("CameraViewModel", "Capturing and stamping photo with template: ${activeSettings.templateType}")
+
+                val renderRequest = StampRenderRequest(
                     sourceBitmap = rawBitmap,
-                    settings = _uiState.value.settings,
+                    templateType = activeSettings.templateType,
+                    settings = activeSettings,
                     location = _uiState.value.location,
                     heading = _uiState.value.compassHeading,
                     timestampMillis = timestamp
                 )
+                val stampedBitmap = WatermarkEngine.renderStamp(renderRequest)
 
                 // 3. Save directly to device DCIM storage & room database
                 val savedMedia = fileManager.saveCapturedPhoto(
