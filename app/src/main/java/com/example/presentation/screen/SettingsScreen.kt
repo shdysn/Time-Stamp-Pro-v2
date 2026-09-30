@@ -331,7 +331,7 @@ fun SettingsScreen(
                     SettingToggleRow("Show Altitude", settings.showAltitude) { viewModel.toggleShowAltitude(it) }
                     SettingToggleRow("Show Compass Bearing", settings.showCompass) { viewModel.toggleShowCompass(it) }
                     SettingToggleRow("Save Directly to Phone DCIM Gallery", settings.autoSaveToGallery) { viewModel.toggleAutoSaveToGallery(it) }
-                    SettingToggleRow("Save Original Unstamped Backup", settings.saveOriginalCopy) { viewModel.toggleSaveOriginal(it) }
+                    SettingToggleRow("Save Original Unstamped Backup (Internal Only)", settings.saveOriginalCopy) { viewModel.toggleSaveOriginal(it) }
                 }
             }
 

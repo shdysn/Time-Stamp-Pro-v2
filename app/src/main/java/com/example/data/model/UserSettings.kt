@@ -61,7 +61,7 @@ data class UserSettings(
     val inspectorName: String = "",
     val customNotes: String = "",
     val selectedTemplateId: String = "custom",
-    val saveOriginalCopy: Boolean = true,
+    val saveOriginalCopy: Boolean = false,
     val autoSaveToGallery: Boolean = true,
     val shutterSound: Boolean = true
 )

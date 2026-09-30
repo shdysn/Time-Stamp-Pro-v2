@@ -47,20 +47,20 @@ class FileManager(private val context: Context) {
         heading: Float,
         timestampMillis: Long = System.currentTimeMillis()
     ): MediaEntity = withContext(Dispatchers.IO) {
-        val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(timestampMillis))
+        val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date(timestampMillis))
         val fileName = "STAMP_$dateStr.jpg"
         val stampedFile = File(imagesDir, fileName)
 
-        // 1. Save local thumbnail / fast cache in internal storage
+        // 1. Save local thumbnail / fast cache in internal storage for instant viewfinder preview
         FileOutputStream(stampedFile).use { out ->
             stampedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
         }
 
-        // 2. Direct save to phone's public DCIM Gallery
+        // 2. Direct save ONLY the stamped photo to phone's public DCIM Gallery (exactly 1 photo per shot)
         val dcimUri = saveDirectToGallery(stampedBitmap, fileName, timestampMillis, location)
         lastSavedDcimUri = dcimUri
 
-        // 3. Save original copy directly to DCIM if requested
+        // 3. Optional private internal backup only (NEVER saved to public gallery to prevent duplicate images)
         var originalPath: String? = null
         if (settings.saveOriginalCopy && originalBitmap != null) {
             val origFileName = "ORIG_$dateStr.jpg"
@@ -69,18 +69,10 @@ class FileManager(private val context: Context) {
                 originalBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
             }
             originalPath = origFile.absolutePath
-            saveDirectToGallery(originalBitmap, origFileName, timestampMillis, location)
         }
 
-        // Notify MediaScanner for instant gallery indexing
-        try {
-            MediaScannerConnection.scanFile(
-                context,
-                arrayOf(stampedFile.absolutePath),
-                arrayOf("image/jpeg"),
-                null
-            )
-        } catch (_: Exception) {}
+        // Clean older cached thumbnails if limit exceeded to save device storage
+        cleanCacheIfExceeded()
 
         val template = TemplateData.getById(settings.selectedTemplateId)
         val formattedDate = DateFormatter.format(timestampMillis, settings.dateFormat)
@@ -332,5 +324,18 @@ class FileManager(private val context: Context) {
             total += file.length()
         }
         return@withContext total
+    }
+
+    private fun cleanCacheIfExceeded() {
+        try {
+            val files = imagesDir.listFiles() ?: return
+            if (files.size > 15) {
+                val sorted = files.sortedBy { it.lastModified() }
+                val toDeleteCount = files.size - 15
+                for (i in 0 until toDeleteCount) {
+                    sorted[i].delete()
+                }
+            }
+        } catch (_: Exception) {}
     }
 }

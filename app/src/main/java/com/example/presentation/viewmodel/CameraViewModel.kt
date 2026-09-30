@@ -229,11 +229,15 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         fileManager.openPhoneGallery(_uiState.value.lastCapturedUri)
     }
 
+    @Volatile
+    private var isCapturingInProgress = false
+
     fun capturePhoto() {
-        if (_uiState.value.isCapturing) return
+        if (isCapturingInProgress || _uiState.value.isCapturing) return
+        isCapturingInProgress = true
+        _uiState.update { it.copy(isCapturing = true) }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isCapturing = true) }
             try {
                 // 1. Capture raw bitmap from camera or fallback simulator
                 val rawBitmap = cameraManager.capturePhoto()
@@ -265,6 +269,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                 e.printStackTrace()
                 _effect.emit(CameraUiEffect.ShowToast("Capture error: ${e.localizedMessage}"))
             } finally {
+                isCapturingInProgress = false
                 _uiState.update { it.copy(isCapturing = false) }
             }
         }
