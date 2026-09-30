@@ -8,6 +8,15 @@ enum class StampPosition(val displayName: String) {
     BOTTOM_BANNER("Full Bottom Banner")
 }
 
+enum class StampDesignStyle(val displayName: String, val description: String) {
+    CLASSIC_CARD("Classic Card", "Rounded dark card with colored border"),
+    MODERN_MINIMAL("Modern Minimal", "Clean translucent frame with vertical accent bar"),
+    TECH_HUD("Cyber Tech HUD", "Corner-bracket tactical frame with monospace data"),
+    OUTLINE_FRAME("Framed Outline", "Elegant border outline with subtle background"),
+    COMPACT_PILL("Compact Pill", "Rounded compact capsule for clean photos"),
+    BOTTOM_BANNER("Full Banner", "Full-width bottom strip across the picture")
+}
+
 enum class CoordinateFormat(val displayName: String) {
     DECIMAL("Decimal (°DD.dddd)"),
     DMS("DMS (° ' \" N/S)"),
@@ -40,6 +49,7 @@ data class UserSettings(
     val coordinateFormat: CoordinateFormat = CoordinateFormat.DECIMAL,
     val altitudeUnit: AltitudeUnit = AltitudeUnit.METERS,
     val stampPosition: StampPosition = StampPosition.BOTTOM_LEFT,
+    val stampDesignStyle: StampDesignStyle = StampDesignStyle.CLASSIC_CARD,
     val textColorHex: Long = 0xFFFFC107, // Safety Gold default
     val backgroundOpacity: Float = 0.65f,
     val fontSize: StampFontSize = StampFontSize.MEDIUM,

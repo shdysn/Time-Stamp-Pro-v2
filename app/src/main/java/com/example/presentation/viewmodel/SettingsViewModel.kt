@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.AltitudeUnit
 import com.example.data.model.CoordinateFormat
+import com.example.data.model.StampDesignStyle
 import com.example.data.model.StampFontSize
 import com.example.data.model.StampPosition
 import com.example.data.model.UserSettings
@@ -68,6 +69,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun updateStampPosition(pos: StampPosition) {
         _settings.update { it.copy(stampPosition = pos) }
+    }
+
+    fun updateStampDesignStyle(style: StampDesignStyle) {
+        _settings.update { it.copy(stampDesignStyle = style) }
     }
 
     fun updateTextColor(colorHex: Long) {

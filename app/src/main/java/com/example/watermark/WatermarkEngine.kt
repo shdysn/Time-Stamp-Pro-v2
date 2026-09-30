@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import com.example.data.model.AltitudeUnit
 import com.example.data.model.LocationData
+import com.example.data.model.StampDesignStyle
 import com.example.data.model.StampPosition
 import com.example.data.model.TemplateData
 import com.example.data.model.UserSettings
@@ -196,28 +197,71 @@ object WatermarkEngine {
                     StampPosition.BOTTOM_BANNER -> RectF(0f, imageHeight - boxHeight - margin, imageWidth, imageHeight)
                 }
 
-                // Draw Background
+                // Draw Background & Borders based on StampDesignStyle
                 val alpha = (settings.backgroundOpacity * 255).toInt().coerceIn(0, 255)
+                val style = if (settings.stampPosition == StampPosition.BOTTOM_BANNER) StampDesignStyle.BOTTOM_BANNER else settings.stampDesignStyle
+
                 if (alpha > 0) {
                     val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.BLACK
-                        this.alpha = alpha
-                        style = Paint.Style.FILL
+                        this.alpha = if (style == StampDesignStyle.OUTLINE_FRAME) (alpha * 0.4f).toInt() else alpha
+                        this.style = Paint.Style.FILL
                     }
                     val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = settings.textColorHex.toInt()
-                        this.alpha = (alpha * 0.8f).toInt()
-                        style = Paint.Style.STROKE
-                        strokeWidth = 2f * finalScale
+                        this.alpha = (alpha * 0.9f).toInt()
+                        this.style = Paint.Style.STROKE
+                        this.strokeWidth = (if (style == StampDesignStyle.OUTLINE_FRAME) 2.5f else 1.8f) * finalScale
                     }
 
-                    val cornerRadius = 12f * finalScale
-                    if (settings.stampPosition == StampPosition.BOTTOM_BANNER) {
-                        canvas.drawRect(bgRect, bgPaint)
-                        canvas.drawLine(0f, bgRect.top, imageWidth, bgRect.top, borderPaint)
-                    } else {
-                        canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, bgPaint)
-                        canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, borderPaint)
+                    when (style) {
+                        StampDesignStyle.CLASSIC_CARD -> {
+                            val cornerRadius = 12f * finalScale
+                            canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, bgPaint)
+                            canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, borderPaint)
+                        }
+                        StampDesignStyle.MODERN_MINIMAL -> {
+                            val cornerRadius = 6f * finalScale
+                            canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, bgPaint)
+                            // Left vertical accent strip
+                            val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = settings.textColorHex.toInt()
+                                this.style = Paint.Style.FILL
+                            }
+                            val barRect = RectF(bgRect.left, bgRect.top, bgRect.left + (5f * finalScale), bgRect.bottom)
+                            canvas.drawRoundRect(barRect, 3f * finalScale, 3f * finalScale, accentPaint)
+                        }
+                        StampDesignStyle.TECH_HUD -> {
+                            canvas.drawRect(bgRect, bgPaint)
+                            // Corner cyber brackets
+                            val bracketLen = 16f * finalScale
+                            // Top-left
+                            canvas.drawLine(bgRect.left, bgRect.top, bgRect.left + bracketLen, bgRect.top, borderPaint)
+                            canvas.drawLine(bgRect.left, bgRect.top, bgRect.left, bgRect.top + bracketLen, borderPaint)
+                            // Top-right
+                            canvas.drawLine(bgRect.right, bgRect.top, bgRect.right - bracketLen, bgRect.top, borderPaint)
+                            canvas.drawLine(bgRect.right, bgRect.top, bgRect.right, bgRect.top + bracketLen, borderPaint)
+                            // Bottom-left
+                            canvas.drawLine(bgRect.left, bgRect.bottom, bgRect.left + bracketLen, bgRect.bottom, borderPaint)
+                            canvas.drawLine(bgRect.left, bgRect.bottom, bgRect.left, bgRect.bottom - bracketLen, borderPaint)
+                            // Bottom-right
+                            canvas.drawLine(bgRect.right, bgRect.bottom, bgRect.right - bracketLen, bgRect.bottom, borderPaint)
+                            canvas.drawLine(bgRect.right, bgRect.bottom, bgRect.right, bgRect.bottom - bracketLen, borderPaint)
+                        }
+                        StampDesignStyle.OUTLINE_FRAME -> {
+                            val cornerRadius = 6f * finalScale
+                            canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, bgPaint)
+                            canvas.drawRoundRect(bgRect, cornerRadius, cornerRadius, borderPaint)
+                        }
+                        StampDesignStyle.COMPACT_PILL -> {
+                            val pillRadius = (bgRect.height() / 2f).coerceAtMost(24f * finalScale)
+                            canvas.drawRoundRect(bgRect, pillRadius, pillRadius, bgPaint)
+                            canvas.drawRoundRect(bgRect, pillRadius, pillRadius, borderPaint)
+                        }
+                        StampDesignStyle.BOTTOM_BANNER -> {
+                            canvas.drawRect(bgRect, bgPaint)
+                            canvas.drawLine(0f, bgRect.top, imageWidth, bgRect.top, borderPaint)
+                        }
                     }
                 }
 

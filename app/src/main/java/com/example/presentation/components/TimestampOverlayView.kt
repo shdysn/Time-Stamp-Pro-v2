@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Explore
@@ -33,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AltitudeUnit
 import com.example.data.model.LocationData
+import com.example.data.model.StampDesignStyle
 import com.example.data.model.StampPosition
 import com.example.data.model.TemplateData
 import com.example.data.model.UserSettings
@@ -102,21 +105,46 @@ fun TimestampOverlayView(
                     .padding(if (isBanner) 0.dp else 16.dp),
                 contentAlignment = boxAlignment
             ) {
-                Column(
+                val style = if (isBanner) StampDesignStyle.BOTTOM_BANNER else settings.stampDesignStyle
+                val containerShape = when (style) {
+                    StampDesignStyle.CLASSIC_CARD -> RoundedCornerShape(10.dp)
+                    StampDesignStyle.MODERN_MINIMAL -> RoundedCornerShape(6.dp)
+                    StampDesignStyle.TECH_HUD -> RoundedCornerShape(2.dp)
+                    StampDesignStyle.OUTLINE_FRAME -> RoundedCornerShape(6.dp)
+                    StampDesignStyle.COMPACT_PILL -> RoundedCornerShape(22.dp)
+                    StampDesignStyle.BOTTOM_BANNER -> RoundedCornerShape(0.dp)
+                }
+                val effectiveBgAlpha = if (style == StampDesignStyle.OUTLINE_FRAME) bgAlpha * 0.45f else bgAlpha
+                val borderWidth = if (isBanner) 0.dp else if (style == StampDesignStyle.OUTLINE_FRAME) 2.dp else 1.dp
+
+                Row(
                     modifier = Modifier
                         .then(if (isBanner) Modifier.fillMaxWidth() else Modifier)
                         .background(
-                            color = Color.Black.copy(alpha = bgAlpha),
-                            shape = if (isBanner) RoundedCornerShape(0.dp) else RoundedCornerShape(8.dp)
+                            color = Color.Black.copy(alpha = effectiveBgAlpha),
+                            shape = containerShape
                         )
                         .border(
-                            width = if (isBanner) 0.dp else 1.dp,
-                            color = stampColor.copy(alpha = 0.6f),
-                            shape = if (isBanner) RoundedCornerShape(0.dp) else RoundedCornerShape(8.dp)
+                            width = borderWidth,
+                            color = stampColor.copy(alpha = if (style == StampDesignStyle.OUTLINE_FRAME) 0.9f else 0.65f),
+                            shape = containerShape
                         )
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                        .padding(horizontal = if (style == StampDesignStyle.COMPACT_PILL) 16.dp else 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (style == StampDesignStyle.MODERN_MINIMAL) {
+                        Box(
+                            modifier = Modifier
+                                .width(3.5.dp)
+                                .height(50.dp)
+                                .background(stampColor, RoundedCornerShape(2.dp))
+                        )
+                    }
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
                     // Mock GPS Warning if active
                     if (location.isMock) {
                         Row(
@@ -239,4 +267,5 @@ fun TimestampOverlayView(
             }
         }
     }
+}
 }

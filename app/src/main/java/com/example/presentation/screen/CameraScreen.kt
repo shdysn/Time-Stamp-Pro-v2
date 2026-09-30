@@ -14,37 +14,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.GpsFixed
-import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -60,20 +40,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
-import com.example.presentation.components.CustomTextDialog
-import com.example.presentation.components.FlashButton
 import com.example.presentation.components.GalleryShortcutButton
 import com.example.presentation.components.ShutterButton
-import com.example.presentation.components.SwitchCameraButton
-import com.example.presentation.components.TemplateQuickSelector
 import com.example.presentation.components.TimestampOverlayView
-import com.example.presentation.components.ZoomControlBar
 import com.example.presentation.designsystem.AppColors
 import com.example.presentation.viewmodel.CameraUiEffect
 import com.example.presentation.viewmodel.CameraViewModel
@@ -128,8 +101,8 @@ fun CameraScreen(
         viewModel.effect.collect { effect ->
             when (effect) {
                 is CameraUiEffect.PhotoSaved -> {
+                    // Shutter flash effect only - no toast popup as requested
                     flashWhiteScreen = true
-                    Toast.makeText(context, "Saved directly to DCIM Gallery 📸", Toast.LENGTH_SHORT).show()
                 }
                 is CameraUiEffect.ShowToast -> {
                     Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
@@ -140,7 +113,7 @@ fun CameraScreen(
 
     LaunchedEffect(flashWhiteScreen) {
         if (flashWhiteScreen) {
-            kotlinx.coroutines.delay(100L)
+            kotlinx.coroutines.delay(80L)
             flashWhiteScreen = false
         }
     }
@@ -190,175 +163,85 @@ fun CameraScreen(
             Box(modifier = Modifier.fillMaxSize().background(Color.White))
         }
 
-        // 4. Top Action Bar
+        // 4. Top Action Bar: Clean & Minimal - Only the Settings Icon as requested
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 32.dp)
+                .align(Alignment.TopEnd)
+        ) {
+            IconButton(
+                onClick = onNavigateToSettings,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(48.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+
+        // 5. Bottom Controls: Fast Front/Back switch, Shutter, and Gallery Thumbnail
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 28.dp)
-                .align(Alignment.TopCenter),
+                .align(Alignment.BottomCenter)
+                .background(Color.Black.copy(alpha = 0.35f))
+                .padding(horizontal = 28.dp, vertical = 28.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Flash Mode
-            FlashButton(
-                flashMode = uiState.flashMode,
-                onClick = { viewModel.cycleFlash() }
-            )
-
-            // GPS Signal & Mock indicator pill
-            Surface(
-                color = Color.Black.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.clickable { onNavigateToSettings() }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = if (uiState.location.isMock) Icons.Default.Warning else Icons.Default.GpsFixed,
-                        contentDescription = "GPS Status",
-                        tint = if (uiState.location.isMock) AppColors.AccentRed else AppColors.AccentGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = if (uiState.location.isMock) "MOCK GPS" else if (uiState.location.accuracy > 0) "±${uiState.location.accuracy.toInt()}m" else "GPS LOCK",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            // Top Actions (Stamp Hide/Display, Custom Text, Settings)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Hide / Display Stamp Toggle Button
-                IconButton(
-                    onClick = { viewModel.toggleStampVisibility() },
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = if (uiState.settings.isStampVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        contentDescription = if (uiState.settings.isStampVisible) "Hide Stamp" else "Display Stamp",
-                        tint = if (uiState.settings.isStampVisible) AppColors.AccentGold else Color.Gray,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Custom Text on Photo Button
-                IconButton(
-                    onClick = { viewModel.setCustomTextDialogVisible(true) },
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.TextFields,
-                        contentDescription = "Text on Picture",
-                        tint = if (uiState.settings.isCustomTextEnabled && uiState.settings.customText.isNotBlank()) AppColors.AccentCyan else Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Settings Action
-                IconButton(
-                    onClick = onNavigateToSettings,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-        }
-
-        // 5. Bottom Controls Container
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(Color.Black.copy(alpha = 0.45f))
-                .padding(bottom = 28.dp, top = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Zoom Selector
-            ZoomControlBar(
-                currentZoom = uiState.currentZoom,
-                maxZoom = uiState.maxZoom,
-                onZoomSelected = { viewModel.setZoom(it) }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Main Capture Row
-            Row(
+            // Left: Device Gallery Shortcut / Last Photo Thumbnail
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, Color.White.copy(alpha = 0.7f), CircleShape)
+                    .clickable { viewModel.openDeviceGallery() },
+                contentAlignment = Alignment.Center
             ) {
-                // Phone Gallery Shortcut / Thumbnail
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(CircleShape)
-                        .border(2.dp, Color.White.copy(alpha = 0.7f), CircleShape)
-                        .clickable { viewModel.openDeviceGallery() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (uiState.lastCapturedMedia != null) {
-                        AsyncImage(
-                            model = File(uiState.lastCapturedMedia!!.filePath),
-                            contentDescription = "Open Phone DCIM Gallery",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        GalleryShortcutButton(onClick = { viewModel.openDeviceGallery() })
-                    }
+                if (uiState.lastCapturedMedia != null) {
+                    AsyncImage(
+                        model = File(uiState.lastCapturedMedia!!.filePath),
+                        contentDescription = "Open Phone DCIM Gallery",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    GalleryShortcutButton(onClick = { viewModel.openDeviceGallery() })
                 }
+            }
 
-                // Shutter Button
-                ShutterButton(
-                    onClick = { viewModel.capturePhoto() },
-                    isCapturing = uiState.isCapturing
-                )
+            // Center: Shutter Button
+            ShutterButton(
+                onClick = { viewModel.capturePhoto() },
+                isCapturing = uiState.isCapturing
+            )
 
-                // Switch Camera Lens Button
-                SwitchCameraButton(
-                    onClick = {
-                        previewViewRef?.let { pv ->
-                            viewModel.toggleCamera(lifecycleOwner, pv)
-                        }
+            // Right: Instant Front / Back Camera Switch Button
+            IconButton(
+                onClick = {
+                    previewViewRef?.let { pv ->
+                        viewModel.toggleCamera(lifecycleOwner, pv)
                     }
+                },
+                modifier = Modifier
+                    .size(54.dp)
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .border(1.5.dp, Color.White.copy(alpha = 0.7f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Cameraswitch,
+                    contentDescription = if (uiState.isFrontCamera) "Switch to Back Camera" else "Switch to Front Camera",
+                    tint = if (uiState.isFrontCamera) AppColors.AccentGold else Color.White,
+                    modifier = Modifier.size(28.dp)
                 )
             }
-        }
-
-        // Custom Text on Picture Dialog
-        if (uiState.showCustomTextDialog) {
-            CustomTextDialog(
-                initialText = uiState.settings.customText,
-                initialEnabled = uiState.settings.isCustomTextEnabled,
-                initialSize = uiState.settings.customTextSize,
-                initialBold = uiState.settings.isCustomTextBold,
-                initialItalic = uiState.settings.isCustomTextItalic,
-                initialUnderline = uiState.settings.isCustomTextUnderline,
-                initialColorHex = uiState.settings.customTextColorHex,
-                onApply = { text, isEnabled, size, isBold, isItalic, isUnderline, colorHex ->
-                    viewModel.updateCustomText(text, isEnabled, size, isBold, isItalic, isUnderline, colorHex)
-                },
-                onDismiss = { viewModel.setCustomTextDialogVisible(false) }
-            )
         }
     }
 }
