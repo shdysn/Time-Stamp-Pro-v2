@@ -209,4 +209,39 @@ class TemplatePipelineTest {
         assertTrue("Full Banner must be full width", banner.isFullWidth)
         assertEquals("Full Banner bottom corner radius should be zero", 0f, banner.cornerRadiusDp, 0.01f)
     }
+
+    @Test
+    fun testPlusCodeIsFilteredFromShortLocation() {
+        // Test case from user: address starts with Plus Code "2HVR+R6Q, Lahore, Punjab, Pakistan"
+        val locWithPlusCode = LocationData(
+            latitude = 31.5204,
+            longitude = 74.3587,
+            address = "2HVR+R6Q, Lahore, Punjab, Pakistan",
+            locality = ""
+        )
+        val shortPlace = locWithPlusCode.getShortLocation()
+        assertFalse("Short location must not contain raw plus code '2HVR+R6Q'", shortPlace.contains("2HVR+R6Q"))
+        assertEquals("Lahore", shortPlace)
+
+        // When locality is set
+        val locWithLocality = LocationData(
+            latitude = 31.5204,
+            longitude = 74.3587,
+            address = "2HVR+R6Q, Sector C Bahria Town, Lahore",
+            locality = "Lahore",
+            subLocality = "Sector C"
+        )
+        val shortPlace2 = locWithLocality.getShortLocation()
+        assertFalse("Short location must not contain raw plus code", shortPlace2.contains("+"))
+        assertEquals("Sector C, Lahore", shortPlace2)
+
+        // Verify Plus code detection helper
+        assertTrue(LocationData.isCodeOrPlusCode("2HVR+R6Q"))
+        assertTrue(LocationData.isCodeOrPlusCode("8FVC9G8F+5W"))
+        assertTrue(LocationData.isCodeOrPlusCode("7MRX+W9"))
+        assertTrue(LocationData.isCodeOrPlusCode("54000"))
+        assertFalse(LocationData.isCodeOrPlusCode("Lahore"))
+        assertFalse(LocationData.isCodeOrPlusCode("San Francisco"))
+        assertFalse(LocationData.isCodeOrPlusCode("Main Market"))
+    }
 }

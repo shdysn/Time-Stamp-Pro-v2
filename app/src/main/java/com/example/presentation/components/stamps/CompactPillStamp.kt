@@ -77,9 +77,7 @@ fun CompactPillStamp(
                 fontFamily = FontFamily.Monospace
             )
 
-            val shortPlace = location.locality.ifBlank {
-                location.address.split(",").firstOrNull()?.trim() ?: ""
-            }
+            val shortPlace = location.getShortLocation()
             if (shortPlace.isNotBlank()) {
                 Text(
                     text = "•",

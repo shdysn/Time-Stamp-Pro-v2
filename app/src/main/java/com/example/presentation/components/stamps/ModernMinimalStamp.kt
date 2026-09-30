@@ -83,9 +83,7 @@ fun ModernMinimalStamp(
                         fontFamily = FontFamily.SansSerif
                     )
 
-                    val shortLoc = location.locality.ifBlank {
-                        location.address.split(",").firstOrNull() ?: ""
-                    }
+                    val shortLoc = location.getShortLocation()
                     if (shortLoc.isNotBlank()) {
                         Text(
                             text = "•",

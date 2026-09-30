@@ -138,8 +138,15 @@ class GPSManager(private val context: Context) {
             lastResolvedLat = location.latitude
             lastResolvedLng = location.longitude
             scope.launch {
-                val resolved = addressResolver.getAddress(location.latitude, location.longitude)
-                _locationData.value = _locationData.value.copy(address = resolved)
+                val resolved = addressResolver.resolveAddress(location.latitude, location.longitude)
+                _locationData.value = _locationData.value.copy(
+                    address = resolved.fullAddress,
+                    locality = resolved.locality,
+                    subLocality = resolved.subLocality,
+                    adminArea = resolved.adminArea,
+                    country = resolved.country,
+                    postalCode = resolved.postalCode
+                )
             }
         }
     }

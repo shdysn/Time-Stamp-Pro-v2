@@ -194,9 +194,7 @@ object StampRenderer {
     ) {
         val timeStr = DateFormatter.format(request.timestampMillis, "hh:mm a")
         val dateStr = DateFormatter.format(request.timestampMillis, "MMM dd, yyyy")
-        val shortLoc = request.location.locality.ifBlank {
-            request.location.address.split(",").firstOrNull()?.trim() ?: ""
-        }
+        val shortLoc = request.location.getShortLocation()
 
         val timePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
@@ -441,9 +439,7 @@ object StampRenderer {
     ) {
         val timeStr = DateFormatter.format(request.timestampMillis, "HH:mm")
         val dateStr = DateFormatter.format(request.timestampMillis, "MM/dd")
-        val shortPlace = request.location.locality.ifBlank {
-            request.location.address.split(",").firstOrNull()?.trim() ?: ""
-        }
+        val shortPlace = request.location.getShortLocation()
 
         val pillText = if (shortPlace.isNotBlank()) "$timeStr  •  $dateStr  •  $shortPlace" else "$timeStr  •  $dateStr"
 
