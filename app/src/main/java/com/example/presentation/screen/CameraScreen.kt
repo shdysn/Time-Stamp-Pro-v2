@@ -82,7 +82,6 @@ import java.io.File
 @Composable
 fun CameraScreen(
     viewModel: CameraViewModel,
-    onNavigateToGallery: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToTemplates: () -> Unit,
     modifier: Modifier = Modifier
@@ -130,7 +129,7 @@ fun CameraScreen(
             when (effect) {
                 is CameraUiEffect.PhotoSaved -> {
                     flashWhiteScreen = true
-                    Toast.makeText(context, "Saved to Gallery 📸", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Saved directly to DCIM Gallery 📸", Toast.LENGTH_SHORT).show()
                 }
                 is CameraUiEffect.ShowToast -> {
                     Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
@@ -307,24 +306,24 @@ fun CameraScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Gallery Thumbnail Shortcut
+                // Phone Gallery Shortcut / Thumbnail
                 Box(
                     modifier = Modifier
                         .size(54.dp)
                         .clip(CircleShape)
                         .border(2.dp, Color.White.copy(alpha = 0.7f), CircleShape)
-                        .clickable { onNavigateToGallery() },
+                        .clickable { viewModel.openDeviceGallery() },
                     contentAlignment = Alignment.Center
                 ) {
                     if (uiState.lastCapturedMedia != null) {
                         AsyncImage(
                             model = File(uiState.lastCapturedMedia!!.filePath),
-                            contentDescription = "Last Photo",
+                            contentDescription = "Open Phone DCIM Gallery",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        GalleryShortcutButton(onClick = onNavigateToGallery)
+                        GalleryShortcutButton(onClick = { viewModel.openDeviceGallery() })
                     }
                 }
 

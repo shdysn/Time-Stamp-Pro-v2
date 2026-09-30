@@ -36,6 +36,9 @@ class FileManager(private val context: Context) {
             return dir
         }
 
+    var lastSavedDcimUri: Uri? = null
+        private set
+
     suspend fun saveCapturedPhoto(
         stampedBitmap: Bitmap,
         originalBitmap: Bitmap?,
@@ -48,14 +51,25 @@ class FileManager(private val context: Context) {
         val fileName = "STAMP_$dateStr.jpg"
         val stampedFile = File(imagesDir, fileName)
 
-        // 1. Save to local app storage for instant caching & app's offline gallery
+        // 1. Save local thumbnail / fast cache in internal storage
         FileOutputStream(stampedFile).use { out ->
             stampedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
         }
 
-        // 2. Direct save to phone's public Gallery (DCIM / Pictures via MediaStore)
-        if (settings.autoSaveToGallery) {
-            saveDirectToGallery(stampedBitmap, fileName, timestampMillis)
+        // 2. Direct save to phone's public DCIM Gallery
+        val dcimUri = saveDirectToGallery(stampedBitmap, fileName, timestampMillis, location)
+        lastSavedDcimUri = dcimUri
+
+        // 3. Save original copy directly to DCIM if requested
+        var originalPath: String? = null
+        if (settings.saveOriginalCopy && originalBitmap != null) {
+            val origFileName = "ORIG_$dateStr.jpg"
+            val origFile = File(imagesDir, origFileName)
+            FileOutputStream(origFile).use { out ->
+                originalBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            }
+            originalPath = origFile.absolutePath
+            saveDirectToGallery(originalBitmap, origFileName, timestampMillis, location)
         }
 
         // Notify MediaScanner for instant gallery indexing
@@ -67,19 +81,6 @@ class FileManager(private val context: Context) {
                 null
             )
         } catch (_: Exception) {}
-
-        var originalPath: String? = null
-        if (settings.saveOriginalCopy && originalBitmap != null) {
-            val origFileName = "ORIG_$dateStr.jpg"
-            val origFile = File(imagesDir, origFileName)
-            FileOutputStream(origFile).use { out ->
-                originalBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
-            }
-            originalPath = origFile.absolutePath
-            if (settings.autoSaveToGallery) {
-                saveDirectToGallery(originalBitmap, origFileName, timestampMillis)
-            }
-        }
 
         val template = TemplateData.getById(settings.selectedTemplateId)
         val formattedDate = DateFormatter.format(timestampMillis, settings.dateFormat)
@@ -112,25 +113,30 @@ class FileManager(private val context: Context) {
     }
 
     /**
-     * Saves picture directly into device's media gallery (DCIM / Pictures)
+     * Saves picture directly into device's media gallery (DCIM / Camera)
      * so it immediately appears in Google Photos, Samsung Gallery, etc.
      */
     fun saveDirectToGallery(
         bitmap: Bitmap,
         fileName: String,
-        timestampMillis: Long
+        timestampMillis: Long,
+        location: LocationData? = null
     ): Uri? {
         val resolver = context.contentResolver
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10+ (API 29+): Use Scoped Storage MediaStore
-            var contentValues = ContentValues().apply {
+            // Android 10+ (API 29+): Use Scoped Storage MediaStore directly in DCIM/Camera
+            val contentValues = ContentValues().apply {
                 put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
                 put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                 put(MediaStore.Images.Media.DATE_ADDED, timestampMillis / 1000)
                 put(MediaStore.Images.Media.DATE_TAKEN, timestampMillis)
                 // DIRECTORY_DCIM + "/Camera" places it directly into the phone's primary Camera Roll
                 put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM + "/Camera")
+                if (location != null && (location.latitude != 0.0 || location.longitude != 0.0)) {
+                    put(MediaStore.Images.Media.LATITUDE, location.latitude)
+                    put(MediaStore.Images.Media.LONGITUDE, location.longitude)
+                }
                 put(MediaStore.Images.Media.IS_PENDING, 1)
             }
 
@@ -140,17 +146,20 @@ class FileManager(private val context: Context) {
                 null
             }
 
-            // Fallback to Pictures/TimestampCameraPro if DCIM is protected
+            // Fallback to DCIM root if DCIM/Camera fails
             if (uri == null) {
                 try {
-                    contentValues = ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                        put(MediaStore.Images.Media.DATE_ADDED, timestampMillis / 1000)
-                        put(MediaStore.Images.Media.DATE_TAKEN, timestampMillis)
-                        put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/TimestampCameraPro")
-                        put(MediaStore.Images.Media.IS_PENDING, 1)
-                    }
+                    contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_DCIM)
+                    uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                } catch (_: Exception) {
+                    uri = null
+                }
+            }
+
+            // Fallback to Pictures/TimestampCameraPro if DCIM is strictly restricted
+            if (uri == null) {
+                try {
+                    contentValues.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/TimestampCameraPro")
                     uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
                 } catch (_: Exception) {
                     uri = null
@@ -171,11 +180,11 @@ class FileManager(private val context: Context) {
                 }
             }
         } else {
-            // Android 9 and below: write to public DCIM/Camera directory
+            // Android 9 and below: write directly to public DCIM/Camera directory
             try {
                 val publicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
                 val cameraDir = File(publicDir, "Camera").takeIf { it.exists() || it.mkdirs() }
-                    ?: Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                    ?: publicDir
                 if (!cameraDir.exists()) cameraDir.mkdirs()
 
                 val targetFile = File(cameraDir, fileName)
@@ -183,18 +192,61 @@ class FileManager(private val context: Context) {
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
                 }
 
+                var scannedUri: Uri? = null
                 MediaScannerConnection.scanFile(
                     context,
                     arrayOf(targetFile.absolutePath),
-                    arrayOf("image/jpeg"),
-                    null
-                )
-                return Uri.fromFile(targetFile)
+                    arrayOf("image/jpeg")
+                ) { _, uri ->
+                    scannedUri = uri
+                }
+                return scannedUri ?: Uri.fromFile(targetFile)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
         return null
+    }
+
+    /**
+     * Opens the phone's native gallery app (Google Photos, Samsung Gallery, etc.)
+     * directly to view captured DCIM photos.
+     */
+    fun openPhoneGallery(photoUri: Uri? = null) {
+        if (photoUri != null) {
+            try {
+                val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(photoUri, "image/*")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(viewIntent)
+                return
+            } catch (_: Exception) {}
+        }
+
+        try {
+            val galleryIntent = Intent(Intent.ACTION_VIEW, MediaStore.Images.Media.EXTERNAL_CONTENT_URI).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(galleryIntent)
+        } catch (_: Exception) {
+            try {
+                val altIntent = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_GALLERY).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(altIntent)
+            } catch (_: Exception) {
+                // If neither intent resolves, open default content picker
+                try {
+                    val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
+                        type = "image/*"
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(fallbackIntent)
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     suspend fun deletePhoto(media: MediaEntity) = withContext(Dispatchers.IO) {

@@ -2,6 +2,7 @@ package com.example.presentation.viewmodel
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
@@ -39,13 +40,14 @@ data class CameraUiState(
     val currentTimeMillis: Long = System.currentTimeMillis(),
     val settings: UserSettings = UserSettings(),
     val lastCapturedMedia: MediaEntity? = null,
+    val lastCapturedUri: Uri? = null,
     val showQuickNoteDialog: Boolean = false,
     val showCustomTextDialog: Boolean = false,
     val statusMessage: String? = null
 )
 
 sealed interface CameraUiEffect {
-    data class PhotoSaved(val media: MediaEntity) : CameraUiEffect
+    data class PhotoSaved(val media: MediaEntity, val uri: Uri?) : CameraUiEffect
     data class ShowToast(val message: String) : CameraUiEffect
 }
 
@@ -223,6 +225,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun openDeviceGallery() {
+        fileManager.openPhoneGallery(_uiState.value.lastCapturedUri)
+    }
+
     fun capturePhoto() {
         if (_uiState.value.isCapturing) return
 
@@ -242,7 +248,7 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                     timestampMillis = timestamp
                 )
 
-                // 3. Save to storage & room database
+                // 3. Save directly to device DCIM storage & room database
                 val savedMedia = fileManager.saveCapturedPhoto(
                     stampedBitmap = stampedBitmap,
                     originalBitmap = if (_uiState.value.settings.saveOriginalCopy) rawBitmap else null,
@@ -251,9 +257,10 @@ class CameraViewModel(application: Application) : AndroidViewModel(application) 
                     heading = _uiState.value.compassHeading,
                     timestampMillis = timestamp
                 )
+                val dcimUri = fileManager.lastSavedDcimUri
 
-                _uiState.update { it.copy(lastCapturedMedia = savedMedia) }
-                _effect.emit(CameraUiEffect.PhotoSaved(savedMedia))
+                _uiState.update { it.copy(lastCapturedMedia = savedMedia, lastCapturedUri = dcimUri) }
+                _effect.emit(CameraUiEffect.PhotoSaved(savedMedia, dcimUri))
             } catch (e: Exception) {
                 e.printStackTrace()
                 _effect.emit(CameraUiEffect.ShowToast("Capture error: ${e.localizedMessage}"))
