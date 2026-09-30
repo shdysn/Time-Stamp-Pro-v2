@@ -1,0 +1,70 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build & Package APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Prepare Keystore and Environment
+        run: |
+          if [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+            echo "Successfully restored debug.keystore from base64"
+          elif [ ! -f debug.keystore ]; then
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            echo "Generated fallback debug.keystore"
+          fi
+          if [ ! -f .env ] && [ -f .env.example ]; then
+            cp .env.example .env
+            echo "Created .env from .env.example"
+          fi
+
+      - name: Build Optimized APK
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Rename APK for Direct Distribution
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk TimestampCameraPro-v1.0.apk
+          echo "APK prepared: TimestampCameraPro-v1.0.apk"
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: TimestampCameraPro-Debug-APK
+          path: TimestampCameraPro-v1.0.apk
+          retention-days: 30
+
+      - name: Publish Direct APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: success() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        with:
+          tag_name: "v1.0-build-${{ github.run_number }}"
+          name: "Timestamp Camera Pro v1.0 (Build ${{ github.run_number }})"
+          body: "Direct APK download without ZIP compression. Tap the APK file below to install directly on Android."
+          files: TimestampCameraPro-v1.0.apk
